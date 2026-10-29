@@ -1,0 +1,166 @@
+# Shipping pipeline: producer (AISStream -> Kafka), consumer (Kafka -> Redis), Streamlit map.
+# Needs k8s-redis.yaml applied and the shipping-secrets Secret (KAFKA_PASSWORD, AISS_TOKEN).
+# Apply with:  kubectl -n uvasds-services apply -f 06_kafka/shipping/k8s-app.yaml
+
+# Producer: exactly one replica, or every AIS message would be published twice
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: shipping-producer
+  labels: {app: shipping-producer, part-of: shipping}
+spec:
+  replicas: 1
+  strategy: {type: Recreate}  # never two producers at once during a rollout
+  selector:
+    matchLabels: {app: shipping-producer}
+  template:
+    metadata:
+      labels: {app: shipping-producer, part-of: shipping}
+    spec:
+      imagePullSecrets: [{name: nmagee-ghcr.io-auth}]
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 1000
+        seccompProfile: {type: RuntimeDefault}
+      containers:
+        - name: producer
+          image: ghcr.io/nmagee/shipping:1.0
+          args: ["shipping-producer.py"]
+          env:
+            - {name: KAFKA_BROKER, value: "kafka.uvasds-services.svc.cluster.local:9092"}
+            - {name: KAFKA_USERNAME, value: kafka_user}
+            - name: KAFKA_PASSWORD
+              valueFrom: {secretKeyRef: {name: shipping-secrets, key: KAFKA_PASSWORD}}
+            - name: AISS_TOKEN
+              valueFrom: {secretKeyRef: {name: shipping-secrets, key: AISS_TOKEN}}
+          resources:
+            requests: {cpu: 50m, memory: 128Mi}
+            limits: {cpu: 500m, memory: 256Mi}
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities: {drop: [ALL]}
+---
+# Consumer: writes ship state + 24h tracks to shipping-redis
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: shipping-consumer
+  labels: {app: shipping-consumer, part-of: shipping}
+spec:
+  replicas: 1
+  strategy: {type: Recreate}
+  selector:
+    matchLabels: {app: shipping-consumer}
+  template:
+    metadata:
+      labels: {app: shipping-consumer, part-of: shipping}
+    spec:
+      imagePullSecrets: [{name: nmagee-ghcr.io-auth}]
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 1000
+        seccompProfile: {type: RuntimeDefault}
+      containers:
+        - name: consumer
+          image: ghcr.io/nmagee/shipping:1.0
+          args: ["shipping-consumer.py"]
+          env:
+            - {name: KAFKA_BROKER, value: "kafka.uvasds-services.svc.cluster.local:9092"}
+            - {name: KAFKA_USERNAME, value: kafka_user}
+            - name: KAFKA_PASSWORD
+              valueFrom: {secretKeyRef: {name: shipping-secrets, key: KAFKA_PASSWORD}}
+            - {name: REDIS_HOST, value: shipping-redis}
+          resources:
+            requests: {cpu: 100m, memory: 256Mi}
+            limits: {cpu: "1", memory: 512Mi}
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities: {drop: [ALL]}
+---
+# Map: Streamlit app reading shipping-redis, served on 8501
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: shipping-map
+  labels: {app: shipping-map, part-of: shipping}
+spec:
+  replicas: 1
+  selector:
+    matchLabels: {app: shipping-map}
+  template:
+    metadata:
+      labels: {app: shipping-map, part-of: shipping}
+    spec:
+      imagePullSecrets: [{name: nmagee-ghcr.io-auth}]
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 1000
+        seccompProfile: {type: RuntimeDefault}
+      containers:
+        - name: map
+          image: ghcr.io/nmagee/shipping:1.1
+          args: ["-m", "streamlit", "run", "shipping-map.py", "--server.port", "8501",
+                 "--server.address", "0.0.0.0", "--server.headless", "true",
+                 "--browser.gatherUsageStats", "false"]
+          env:
+            - {name: REDIS_HOST, value: shipping-redis}
+          ports:
+            - {name: http, containerPort: 8501}
+          readinessProbe:
+            httpGet: {path: /_stcore/health, port: http}
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            httpGet: {path: /_stcore/health, port: http}
+            initialDelaySeconds: 20
+            periodSeconds: 20
+          resources:
+            requests: {cpu: 100m, memory: 256Mi}
+            limits: {cpu: "1", memory: 1Gi}
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities: {drop: [ALL]}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: shipping-map
+  labels: {app: shipping-map, part-of: shipping}
+spec:
+  selector: {app: shipping-map}
+  ports:
+    - {name: http, port: 80, targetPort: http}
+---
+# Public map at https://shipping.pods.uvarc.io; cert-manager issues the TLS cert.
+# Streamlit streams updates over a websocket (/_stcore/stream), so the Service is listed in
+# websocket-services. No rewrite-target: rewriting every path to "/" would break Streamlit.
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: shipping-map
+  labels: {app: shipping-map, part-of: shipping}
+  annotations:
+    kubernetes.io/ingress.class: nginx
+    nginx.org/websocket-services: "shipping-map"
+    acme.cert-manager.io/http01-edit-in-place: "true"
+    cert-manager.io/cluster-issuer: letsencrypt-cluster-issuer
+    nginx.org/proxy-connect-timeout: "600s"
+    nginx.org/proxy-read-timeout: "600s"
+    nginx.org/proxy-send-timeout: "600s"
+spec:
+  tls:
+    - hosts: [shipping.pods.uvarc.io]
+      secretName: shipping.pods.uvarc.io-tls
+  rules:
+    - host: shipping.pods.uvarc.io
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: shipping-map
+                port: {name: http}

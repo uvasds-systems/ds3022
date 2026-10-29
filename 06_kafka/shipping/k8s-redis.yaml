@@ -1,0 +1,75 @@
+# Redis for the shipping pipeline: live ship state + 24h tracks written by shipping-consumer.py.
+# Apply with:  kubectl -n uvasds-services apply -f 06_kafka/shipping/k8s-redis.yaml
+# In-cluster address:  shipping-redis.uvasds-services.svc.cluster.local:6379
+
+# 2Gi Longhorn volume so AOF data survives pod restarts
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: shipping-redis-data
+  labels: {app: shipping-redis}
+spec:
+  accessModes: [ReadWriteOnce]
+  storageClassName: longhorn
+  resources:
+    requests:
+      storage: 2Gi
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: shipping-redis
+  labels: {app: shipping-redis}
+spec:
+  replicas: 1
+  strategy: {type: Recreate}  # RWO volume: the old pod must release it before the new one starts
+  selector:
+    matchLabels: {app: shipping-redis}
+  template:
+    metadata:
+      labels: {app: shipping-redis}
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 999   # "redis" user in the official image
+        runAsGroup: 999
+        fsGroup: 999
+        seccompProfile: {type: RuntimeDefault}
+      containers:
+        - name: redis
+          image: redis:8.10.2
+          # maxmemory sits below the container limit; every key has a TTL, so when full,
+          # evict the keys closest to expiring rather than rejecting writes
+          args: ["--appendonly", "yes", "--maxmemory", "768mb", "--maxmemory-policy", "volatile-ttl"]
+          ports:
+            - {name: redis, containerPort: 6379}
+          volumeMounts:
+            - {name: data, mountPath: /data}
+          resources:
+            requests: {cpu: 100m, memory: 256Mi}
+            limits: {cpu: 500m, memory: 1Gi}
+          readinessProbe:
+            exec: {command: [redis-cli, ping]}
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            tcpSocket: {port: redis}
+            initialDelaySeconds: 15
+            periodSeconds: 20
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities: {drop: [ALL]}
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: shipping-redis-data
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: shipping-redis
+  labels: {app: shipping-redis}
+spec:
+  selector: {app: shipping-redis}
+  ports:
+    - {name: redis, port: 6379, targetPort: redis}

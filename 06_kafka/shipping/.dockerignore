@@ -1,0 +1,6 @@
+*
+!requirements.txt
+!shipping-producer.py
+!shipping-consumer.py
+!shipping-map.py
+!.streamlit/config.toml
