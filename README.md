@@ -15,4 +15,5 @@
 - [**Queries** | **Columnar**](02_query/)
 - [**Transformation** | **DuckDB** | **`dbt`** ](03_transform/)
 - [**Ingest** | **APIs** | **Exceptions** | **Logging** | **Pagination** | **Rate Limits**](04_apis/)
-- [**Prefect Workflow Orchestration**](05_prefect)
+- [**Prefect Workflow Orchestration**](05_prefect/)
+- [**Kafka** | **Streaming** | **Producers** | **Consumers**](06_kafka/)
