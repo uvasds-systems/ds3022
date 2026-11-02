@@ -24,6 +24,9 @@ redis = "*"
 streamlit = "*"
 websockets = "<17,>=15"
 httpx2 = "*"
+asyncio = "*"
+websocket-client = "*"
+requests_sse = "*"
 
 [dev-packages]
 
