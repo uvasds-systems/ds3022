@@ -44,4 +44,4 @@ with self.app.get_producer() as producer:      # opened once
 
 Each `produce()` then returns right away, the Kafka client batches messages in the background, and `flush()` runs only once, at shutdown. Cutting the per-event prints to a periodic summary would help a little more.
 
-For more robustness, you could also reconnect when the stream drops, passing the last event ID so Wikimedia resumes where it left off. That's optional for a class demo.
+For more robustness, you could also reconnect when the stream drops, passing the last event ID so Wikimedia resumes where it left off.
