@@ -17,3 +17,5 @@
 - [**Ingest** | **APIs** | **Exceptions** | **Logging** | **Pagination** | **Rate Limits**](04_apis/)
 - [**Prefect Workflow Orchestration**](05_prefect/)
 - [**Kafka** | **Streaming** | **Producers** | **Consumers**](06_kafka/)
+- [**Redis** | **NoSQL**](07_redis/)
+
