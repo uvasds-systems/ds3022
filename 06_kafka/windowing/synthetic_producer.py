@@ -3,7 +3,7 @@
 """
 Windowing Producer
 
-Sends 1000 sensor readings to the "sensor-events" topic, one every 0.5 s.
+Sends 500 sensor readings to the "sensor-events" topic, one every 0.5 s.
 About 10% of events are "late": their event time is up to 8 s in the past.
 The event time is also set as the Kafka message timestamp, so quixstreams
 windows on the consumer side group by event time, not arrival time.
@@ -16,7 +16,7 @@ from quixstreams import Application
 
 KAFKA_BROKER = os.getenv("KAFKA_BROKER", "127.0.0.1:19092,127.0.0.1:29092,127.0.0.1:39092")
 TOPIC = "sensor-events"
-NUM_EVENTS = 1000
+NUM_EVENTS = 500
 SENSOR_ID = "sensor-1"
 
 # Kafka app and topic; force IPv4 to avoid localhost resolving to IPv6

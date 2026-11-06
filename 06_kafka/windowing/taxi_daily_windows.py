@@ -5,7 +5,7 @@ import json
 def import_daily(): 
     try:
         conn = duckdb.connect('daily.db')
-        conn.execute("CREATE TABLE IF NOT EXISTS daily AS SELECT * FROM read_parquet('https://d37ci6vzurychx.cloudfront.net/trip-data/yellow_tripdata_2025-08.parquet')")
+        conn.execute("CREATE TABLE IF NOT EXISTS daily AS SELECT * FROM read_parquet('https://d37ci6vzurychx.cloudfront.net/trip-data/yellow_tripdata_2026-07.parquet')")
     except Exception as e:
         print(e)
     finally:

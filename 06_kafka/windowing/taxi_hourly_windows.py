@@ -9,7 +9,7 @@ def generate_hourly_summary():
         hourly_summary = conn.execute("""
             SELECT EXTRACT(HOUR FROM tpep_pickup_datetime) AS hour, count(*) AS count 
             FROM daily 
-            WHERE DATE(tpep_pickup_datetime) = '2025-08-10' 
+            WHERE DATE(tpep_pickup_datetime) = '2026-07-10' 
             GROUP BY hour 
             ORDER BY hour
         """)
@@ -20,7 +20,7 @@ def generate_hourly_summary():
         CREATE OR REPLACE TABLE hourly_summary AS 
             SELECT EXTRACT(HOUR FROM tpep_pickup_datetime) AS hour, count(*) AS count 
             FROM daily 
-            WHERE DATE(tpep_pickup_datetime) = '2025-08-10' 
+            WHERE DATE(tpep_pickup_datetime) = '2026-07-10' 
             GROUP BY hour 
             ORDER BY hour
         """)
