@@ -1,5 +1,6 @@
 networks:
-  redpanda_network:
+  stream_network:
+    name: stream_network   # fixed name so other compose stacks (e.g. 08_fastapi) can join it
     driver: bridge
 volumes:
   redpanda-0: null
@@ -34,7 +35,7 @@ services:
     volumes:
       - redpanda-0:/var/lib/redpanda/data
     networks:
-      - redpanda_network
+      - stream_network
     ports:
       - 18081:18081
       - 18082:18082
@@ -60,7 +61,7 @@ services:
     volumes:
       - redpanda-1:/var/lib/redpanda/data
     networks:
-      - redpanda_network
+      - stream_network
     ports:
       - 28081:28081
       - 28082:28082
@@ -88,7 +89,7 @@ services:
     volumes:
       - redpanda-2:/var/lib/redpanda/data
     networks:
-      - redpanda_network
+      - stream_network
     ports:
       - 38081:38081
       - 38082:38082
@@ -100,7 +101,7 @@ services:
     container_name: redpanda-console
     image: docker.redpanda.com/redpandadata/console:v3.13.0
     networks:
-      - redpanda_network
+      - stream_network
     entrypoint: /bin/sh
     command: -c 'echo "$$CONSOLE_CONFIG_FILE" > /tmp/config.yml; /app/console'
     environment:
@@ -125,7 +126,7 @@ services:
     container_name: redpanda-init
     image: docker.redpanda.com/redpandadata/redpanda:v26.2.5
     networks:
-      - redpanda_network
+      - stream_network
     entrypoint: /bin/sh
     command:
       - -c
@@ -140,10 +141,10 @@ services:
       - redpanda-2
 
 # add redis service
-  redis:
-    image: redis:8.10.2
-    container_name: redis
-    ports:
-      - 6379:6379
-    networks:
-      - redpanda_network
+#  redis:
+#    image: redis:8.10.2
+#    container_name: redis
+#    ports:
+#      - 6379:6379
+#    networks:
+#      - stream_network
