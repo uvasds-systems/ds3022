@@ -38,7 +38,20 @@ Check that it downloaded:
 docker model list
 ```
 
-## 3. Expose the local API endpoint
+## 3. Interact Directly with the Model
+
+```
+docker model run ai/smollm2 "What is Docker?"
+```
+
+```
+Docker is a tool used to package and run applications and their dependencies, such as containers and images, in a virtual or physical machine. It's designed to make it easier to create, ship, and run software quickly and inexpensively, which can help businesses save on costs and time by reducing the complexity of deploying software in a traditional environment.
+```
+
+## 4. Expose the local API endpoint
+
+The model is more useful for programmatic integrations if you make it accessible
+via a local API endpoint. Docker Model Runner is equipped to do this.
 
 In Docker Desktop: **Settings → AI → Enable host-side TCP support**, set the port to `12434`, then **Apply**.
 
